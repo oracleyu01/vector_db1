@@ -10,7 +10,7 @@ from chromadb.utils import embedding_functions
 from sentence_transformers import SentenceTransformer
 import numpy as np
 from datetime import datetime
-import openai  # OpenAI API 추가
+from openai import OpenAI  # 최신 OpenAI 패키지 임포트 방식으로 변경
 import os
 
 # 페이지 설정
@@ -24,7 +24,7 @@ with st.sidebar:
     # API 키 저장
     if api_key:
         st.session_state.openai_api_key = api_key
-        openai.api_key = api_key
+        # 클라이언트 초기화는 실제 API 호출 시 수행
         st.success("API 키가 설정되었습니다!")
     else:
         st.warning("ChatGPT를 사용하기 위해 API 키를 입력하세요")
@@ -91,7 +91,7 @@ def search_shops_data(query, n_results=3):
     else:
         return ["관련 데이터를 찾을 수 없습니다."]
 
-# ChatGPT를 이용한 응답 생성 함수
+# ChatGPT를 이용한 응답 생성 함수 (최신 OpenAI API 사용)
 def generate_chatgpt_response(query, context):
     if not context or context[0] == "관련 데이터를 찾을 수 없습니다.":
         return "죄송합니다, 질문에 관련된 정보를 찾을 수 없습니다."
@@ -100,6 +100,9 @@ def generate_chatgpt_response(query, context):
         return f"광진구 착한가게 정보: {' '.join(context)}\n\n(ChatGPT API 키를 입력하면 더 자연스러운 응답을 받을 수 있습니다.)"
     
     try:
+        # OpenAI 클라이언트 초기화
+        client = OpenAI(api_key=st.session_state.openai_api_key)
+        
         # 프롬프트 구성
         prompt = f"""
         다음은 광진구 착한가게에 대한 정보입니다:
@@ -109,12 +112,10 @@ def generate_chatgpt_response(query, context):
         위 정보를 바탕으로 다음 질문에 친절하고 자세하게 답변해주세요:
         
         질문: {query}
-        
-        응답:
         """
         
-        # ChatGPT API 호출
-        response = openai.ChatCompletion.create(
+        # ChatGPT API 호출 (최신 방식)
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "당신은 광진구 착한가게에 대한 정보를 제공하는 도우미입니다. 주어진 정보만을 기반으로 답변해주세요."},
@@ -124,6 +125,7 @@ def generate_chatgpt_response(query, context):
             temperature=0.7
         )
         
+        # 응답 추출 (최신 API 형식)
         return response.choices[0].message.content
     
     except Exception as e:
