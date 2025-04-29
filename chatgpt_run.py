@@ -9,10 +9,25 @@ import chromadb
 from chromadb.utils import embedding_functions
 from sentence_transformers import SentenceTransformer
 import numpy as np
-from datetime import datetime  # datetime import 추가
+from datetime import datetime
+import openai  # OpenAI API 추가
+import os
 
 # 페이지 설정
 st.set_page_config(page_title="광진구 착한가게 소개 챗봇", page_icon="🏪")
+
+# 사이드바에 API 키 입력 필드 추가
+with st.sidebar:
+    st.header("ChatGPT API 설정")
+    api_key = st.text_input("OpenAI API 키를 입력하세요", type="password")
+    
+    # API 키 저장
+    if api_key:
+        st.session_state.openai_api_key = api_key
+        openai.api_key = api_key
+        st.success("API 키가 설정되었습니다!")
+    else:
+        st.warning("ChatGPT를 사용하기 위해 API 키를 입력하세요")
 
 # 페이지 제목
 st.title("🏪 광진구 착한가게 소개 챗봇")
@@ -76,31 +91,52 @@ def search_shops_data(query, n_results=3):
     else:
         return ["관련 데이터를 찾을 수 없습니다."]
 
-# 응답 생성 함수
-def generate_response(query, context):
+# ChatGPT를 이용한 응답 생성 함수
+def generate_chatgpt_response(query, context):
     if not context or context[0] == "관련 데이터를 찾을 수 없습니다.":
         return "죄송합니다, 질문에 관련된 정보를 찾을 수 없습니다."
     
-    # 임베딩 모델을 사용한 간단한 응답 생성
-    response = f"광진구 착한가게 정보: {' '.join(context)}"
+    if not hasattr(st.session_state, 'openai_api_key') or not st.session_state.openai_api_key:
+        return f"광진구 착한가게 정보: {' '.join(context)}\n\n(ChatGPT API 키를 입력하면 더 자연스러운 응답을 받을 수 있습니다.)"
     
-    # 질문 키워드에 따라 응답 맞춤화
-    if "할인" in query.lower() or "혜택" in query.lower():
-        response += "\n\n광진구 착한가게들은 다양한 할인 혜택을 제공하고 있으며, 특히 노인과 학생들을 위한 할인 정책이 많습니다."
-    elif "위치" in query.lower() or "어디" in query.lower():
-        response += "\n\n광진구 착한가게는 중곡동, 구의동, 화양동, 건대입구, 자양동 등 광진구 전역에 분포되어 있습니다."
-    elif "기부" in query.lower() or "봉사" in query.lower():
-        response += "\n\n많은 착한가게들이 수익의 일부를 기부하거나 지역 사회를 위한 봉사 활동에 참여하고 있습니다."
+    try:
+        # 프롬프트 구성
+        prompt = f"""
+        다음은 광진구 착한가게에 대한 정보입니다:
+        
+        {' '.join(context)}
+        
+        위 정보를 바탕으로 다음 질문에 친절하고 자세하게 답변해주세요:
+        
+        질문: {query}
+        
+        응답:
+        """
+        
+        # ChatGPT API 호출
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "당신은 광진구 착한가게에 대한 정보를 제공하는 도우미입니다. 주어진 정보만을 기반으로 답변해주세요."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500,
+            temperature=0.7
+        )
+        
+        return response.choices[0].message.content
     
-    return response
+    except Exception as e:
+        # API 오류 발생 시 기본 응답 제공
+        return f"API 오류가 발생했습니다: {str(e)}\n\n기본 정보: {' '.join(context)}"
 
 # 챗봇 응답 생성 함수
 def chat_response(question):
     # 관련 데이터 검색
     relevant_data = search_shops_data(question)
     
-    # 응답 생성
-    return generate_response(question, relevant_data)
+    # ChatGPT API를 이용한 응답 생성
+    return generate_chatgpt_response(question, relevant_data)
 
 # 세션 상태 초기화
 if "chat_history" not in st.session_state:
@@ -159,7 +195,7 @@ for question in example_questions:
         # 페이지 새로고침
         st.rerun()
 
-# 사이드바 설정
+# 사이드바 설정 (API 키 입력 이후의 나머지 부분)
 with st.sidebar:
     st.header("데이터 관리")
     
