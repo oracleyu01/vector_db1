@@ -9,14 +9,14 @@ import chromadb
 from chromadb.utils import embedding_functions
 from sentence_transformers import SentenceTransformer
 import numpy as np
-
+from datetime import datetime  # datetime import 추가
 
 # 페이지 설정
-st.set_page_config(page_title="부동산 데이터 분석 챗봇", page_icon="🏠")
+st.set_page_config(page_title="광진구 착한가게 소개 챗봇", page_icon="🏪")
 
 # 페이지 제목
-st.title("🏠 부동산 데이터 분석 챗봇")
-st.write("네이버 블로그에서 수집한 부동산 데이터에 대해 질문해보세요.")
+st.title("🏪 광진구 착한가게 소개 챗봇")
+st.write("광진구의 다양한 착한가게에 대한 정보를 물어보세요.")
 
 # 임베딩 모델 설정 (세션 상태에 저장하여 재로딩 방지)
 @st.cache_resource
@@ -38,24 +38,24 @@ def get_chroma_client():
     
     # 컬렉션 생성 또는 가져오기
     try:
-        collection = client.get_collection(name="property_data", embedding_function=embedding_function)
+        collection = client.get_collection(name="gwangjin_shops", embedding_function=embedding_function)
     except:
-        collection = client.create_collection(name="property_data", embedding_function=embedding_function)
+        collection = client.create_collection(name="gwangjin_shops", embedding_function=embedding_function)
         
-        # 가상의 부동산 데이터 (실제로는 크롤링 등으로 수집)
-        property_data = [
-            "강남 아파트 가격이 3개월 연속 하락세를 보이고 있습니다. 많은 블로거들이 금리 인상의 영향이라고 분석하고 있습니다.",
-            "경기도 지역 아파트는 전월 대비 2.5% 하락했으며, 매수자들의 관망세가 계속되고 있습니다.",
-            "30대 블로거들은 대출 규제와 금리 인상으로 내집 마련이 더 어려워졌다고 호소하고 있습니다.",
-            "부동산 전문가들은 현재 시장 상황을 '조정기'로 보고 있으며, 1-2년간 조정이 계속될 것으로 전망합니다.",
-            "40-50대 블로거들은 투자용 부동산의 가치 하락과 임대 수익률 감소에 대한 우려를 표하고 있습니다."
+        # 광진구 착한가게 데이터 (실제로는 공공데이터 등으로 수집)
+        shops_data = [
+            "착한식당 '맛있는 한끼'는 중곡동에 위치한 한식당으로, 지역 농산물을 활용한 건강한 식단을 합리적인 가격에 제공합니다. 특히 어르신들에게 10% 할인 혜택을 제공합니다.",
+            "광진구 구의동의 '친환경 마트'는 지역 생산 제품과 친환경 제품을 판매하며, 매달 수익의 5%를 지역 취약계층에 기부하고 있습니다.",
+            "화양동 '따뜻한 빵집'은 매일 신선한 빵을 구워 판매하며, 폐업시간에 남은 빵을 지역 아동센터에 기부하는 활동을 하고 있습니다.",
+            "건대입구역 근처의 '착한 문구점'은 학생들에게 10% 할인을 제공하며, 학기 초에는 저소득층 학생들에게 무료로 학용품을 지원합니다.",
+            "자양동의 '마을 세탁소'는 독거노인과 장애인 가정의 세탁물을 무료로 수거하여 세탁 서비스를 제공하는 착한가게입니다."
         ]
         
         # 데이터 추가
-        for i, text in enumerate(property_data):
+        for i, text in enumerate(shops_data):
             collection.add(
                 documents=[text],
-                metadatas=[{"source": f"blog_{i}"}],
+                metadatas=[{"source": f"shop_{i}"}],
                 ids=[f"doc_{i}"]
             )
     
@@ -65,7 +65,7 @@ def get_chroma_client():
 collection = get_chroma_client()
 
 # 벡터 유사도 검색 함수
-def search_property_data(query, n_results=3):
+def search_shops_data(query, n_results=3):
     results = collection.query(
         query_texts=[query],
         n_results=n_results
@@ -79,26 +79,25 @@ def search_property_data(query, n_results=3):
 # 응답 생성 함수
 def generate_response(query, context):
     if not context or context[0] == "관련 데이터를 찾을 수 없습니다.":
-        return "죄송합니다, 질문에 관련된 데이터를 찾을 수 없습니다."
+        return "죄송합니다, 질문에 관련된 정보를 찾을 수 없습니다."
     
-    # 임베딩 모델을 사용한 간단한 응답 생성 (실제로는 더 정교한 방법 사용 가능)
-    # 여기서는 가장 유사한 문서를 기반으로 응답 생성
-    response = f"블로그 데이터 분석 결과: {' '.join(context)}"
+    # 임베딩 모델을 사용한 간단한 응답 생성
+    response = f"광진구 착한가게 정보: {' '.join(context)}"
     
     # 질문 키워드에 따라 응답 맞춤화
-    if "가격" in query.lower():
-        response += "\n\n가격 동향을 살펴보면, 전반적으로 하락세를 보이고 있습니다."
-    elif "전망" in query.lower() or "앞으로" in query.lower():
-        response += "\n\n향후 시장 전망은 1-2년간의 조정기가 예상됩니다."
-    elif "30대" in query.lower() or "젊은" in query.lower():
-        response += "\n\n특히 30대는 대출 규제와 금리 인상에 민감하게 반응하고 있습니다."
+    if "할인" in query.lower() or "혜택" in query.lower():
+        response += "\n\n광진구 착한가게들은 다양한 할인 혜택을 제공하고 있으며, 특히 노인과 학생들을 위한 할인 정책이 많습니다."
+    elif "위치" in query.lower() or "어디" in query.lower():
+        response += "\n\n광진구 착한가게는 중곡동, 구의동, 화양동, 건대입구, 자양동 등 광진구 전역에 분포되어 있습니다."
+    elif "기부" in query.lower() or "봉사" in query.lower():
+        response += "\n\n많은 착한가게들이 수익의 일부를 기부하거나 지역 사회를 위한 봉사 활동에 참여하고 있습니다."
     
     return response
 
 # 챗봇 응답 생성 함수
 def chat_response(question):
     # 관련 데이터 검색
-    relevant_data = search_property_data(question)
+    relevant_data = search_shops_data(question)
     
     # 응답 생성
     return generate_response(question, relevant_data)
@@ -113,7 +112,7 @@ for message in st.session_state.chat_history:
         st.markdown(message["content"])
 
 # 사용자 입력 받기
-if prompt := st.chat_input("질문을 입력하세요 (예: 최근 아파트 가격 변화 추세는 어떤가요?)"):
+if prompt := st.chat_input("질문을 입력하세요 (예: 광진구에 어떤 착한가게가 있나요?)"):
     # 사용자 메시지 표시
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -135,10 +134,10 @@ if prompt := st.chat_input("질문을 입력하세요 (예: 최근 아파트 가
 # 예시 질문
 st.sidebar.header("예시 질문")
 example_questions = [
-    "최근 아파트 가격 변화에 대한 사람들의 생각이 어떤가요?",
-    "30대들은 부동산 시장에 대해 어떻게 생각하나요?",
-    "부동산 시장 앞으로 어떻게 될까요?",
-    "경기도 지역 아파트 가격은 어떻게 변했나요?"
+    "광진구에 어떤 착한가게들이 있나요?",
+    "착한가게들이 제공하는 할인 혜택은 무엇인가요?",
+    "착한가게들은 어떤 사회공헌 활동을 하고 있나요?",
+    "중곡동 근처에 있는 착한가게를 알려주세요."
 ]
 
 for question in example_questions:
@@ -165,8 +164,8 @@ with st.sidebar:
     st.header("데이터 관리")
     
     # 데이터 추가 섹션
-    with st.expander("새 데이터 추가"):
-        new_data = st.text_area("새로운 부동산 데이터를 입력하세요")
+    with st.expander("새 착한가게 데이터 추가"):
+        new_data = st.text_area("새로운 착한가게 정보를 입력하세요")
         if st.button("데이터 추가"):
             if new_data:
                 # 새 ID 생성
@@ -178,9 +177,9 @@ with st.sidebar:
                     metadatas=[{"source": "user_input", "date_added": str(datetime.now())}],
                     ids=[new_id]
                 )
-                st.success("데이터가 추가되었습니다!")
+                st.success("착한가게 정보가 추가되었습니다!")
             else:
-                st.error("데이터를 입력해주세요.")
+                st.error("정보를 입력해주세요.")
     
     # 대화 기록 초기화 버튼
     if st.button("대화 기록 초기화"):
@@ -188,11 +187,11 @@ with st.sidebar:
         st.rerun()
 
     # 데이터 확인 섹션
-    with st.expander("부동산 데이터 확인"):
+    with st.expander("착한가게 데이터 확인"):
         # 모든 데이터 가져오기
         all_data = collection.get()
         if all_data and 'documents' in all_data:
-            st.write("현재 분석에 사용 중인 데이터:")
+            st.write("현재 분석에 사용 중인 착한가게 정보:")
             for idx, data in enumerate(all_data['documents']):
                 st.write(f"{idx+1}. {data}")
         else:
