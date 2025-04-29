@@ -1,9 +1,15 @@
+# 코드 최상단에 추가
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import streamlit as st
 import random
 import chromadb
 from chromadb.utils import embedding_functions
 from sentence_transformers import SentenceTransformer
 import numpy as np
+
 
 # 페이지 설정
 st.set_page_config(page_title="부동산 데이터 분석 챗봇", page_icon="🏠")
